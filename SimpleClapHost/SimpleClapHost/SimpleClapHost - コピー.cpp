@@ -259,6 +259,7 @@ void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames,
     clap_audio_buffer input_buffer[1] = {0};
     clap_audio_buffer output_buffer[1] = {0};
 
+	//UINT32 bufferFrameCount = numFrames > BUFFER_SIZE ? BUFFER_SIZE : numFrames; // old way
 	if (pRenderData == 0) {
 		std::cerr << "Buffer frame count is zero." << std::endl;
 		return;
@@ -268,36 +269,26 @@ void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames,
 		std::cerr << "numFrames is more than BUFFER_SIZE: " << numFrames << std::endl;
 	}
 
-    // Now reordering the capture buffer
-    BYTE** pReorderedData = new BYTE * [2];
-    pReorderedData[0] = new BYTE[BUFFER_SIZE / 2];
-    pReorderedData[1] = new BYTE[BUFFER_SIZE / 2];
+    // numFrames 数分のバッファ内データの形式を変更する必要がある：
+    // 後でチャンネル対応する場合もここの処理で対応する
+    // WASAPIのバッファは連続したデータであるため、CLAPの構造体形式のバッファに変換する
 
-    BYTE** pRenderBuffer = new BYTE * [2];
-    pRenderBuffer[0] = new BYTE[BUFFER_SIZE / 2];
-    pRenderBuffer[1] = new BYTE[BUFFER_SIZE / 2];
-
-    for (UINT i = 0; i < BUFFER_SIZE / 2; i++) {
-        pReorderedData[0][i] = pCaptureData[i * 2];
-        pReorderedData[1][i] = pCaptureData[i * 2 + 1];
-
-#if 0 // debug
-        printf("%u: %d,%d:%d,%d => %d,%d\n", i, i * 2, i * 2 + 1,
-            pCaptureData[i * 2],
-            pCaptureData[i * 2 + 1],
-            pReorderedData[0][i],
-            pReorderedData[1][i]
-        );
-#endif
-    }
+    //clap_audio_buffer* input_buffer = new clap_audio_buffer[numFrames];
+	//clap_audio_buffer* output_buffer = new clap_audio_buffer[numFrames];
 
 	input_buffer[0].channel_count = 2;
 	output_buffer[0].channel_count = 2;
 
-	//input_buffer[0].data32 = reinterpret_cast<float**>(&pCaptureData);
-	//output_buffer[0].data32 = reinterpret_cast<float**>(&pRenderData);
-	input_buffer[0].data32 = (float**)pReorderedData; // from capture buffer
-    output_buffer[0].data32 = (float**) pRenderBuffer;
+	input_buffer[0].data32 = reinterpret_cast<float**>(&pCaptureData);
+	output_buffer[0].data32 = reinterpret_cast<float**>(&pRenderData);
+
+    //for (UINT32 i = 0; i < numFrames; i++) {
+    //    input_buffer[i].data32 = reinterpret_cast<float**>(&pCaptureData);
+	//	output_buffer[i].data32 = reinterpret_cast<float**>(&pRenderData);
+	//}
+
+    //input_buffer.data32 = reinterpret_cast<float**>(&pCaptureData); //
+    //output_buffer.data32 = reinterpret_cast<float**>(&pRenderData); //
 
     process_data.audio_inputs = &input_buffer[0];
     process_data.audio_outputs = &output_buffer[0];
@@ -310,20 +301,6 @@ void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames,
 
     // CLAPプラグインのprocess関数を呼び出す
 	plugin->process(plugin, &process_data); // プラグインの処理を実行
-
-    // Now reordering the render buffer
-	for (UINT i = 0; i < BUFFER_SIZE / 2; i++) {
-		pRenderData[i * 2] = pRenderBuffer[0][i];
-		pRenderData[i * 2 + 1] = pRenderBuffer[1][i];
-	}
-
-	// メモリの解放
-	delete[] pReorderedData[0];
-	delete[] pReorderedData[1];
-	delete[] pReorderedData;
-	delete[] pRenderBuffer[0];
-	delete[] pRenderBuffer[1];
-	delete[] pRenderBuffer;
 }
 
 // Entry point

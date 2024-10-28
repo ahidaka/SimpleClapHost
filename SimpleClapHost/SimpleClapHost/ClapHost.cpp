@@ -1,5 +1,6 @@
 #include <clap/clap.h>
 #include <Windows.h>
+#include <winnt.h>
 #include <audioclient.h>
 #include <mmdeviceapi.h>
 #include <vector>
@@ -11,6 +12,30 @@ void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames,
 
 clap_plugin* plugin = nullptr;
 
+const void* get_extension(const struct clap_host* host, const char* extension_id) {
+    UNREFERENCED_PARAMETER(host);
+    UNREFERENCED_PARAMETER(extension_id);
+	std::cout << "get_extension" << std::endl;
+	return get_extension;
+}
+
+void request_restart(const struct clap_host* host) {
+    UNREFERENCED_PARAMETER(host);
+    std::cout << "request_restart" << std::endl;
+}
+
+void request_process(const struct clap_host* host) {
+    UNREFERENCED_PARAMETER(host);
+    std::cout << "request_process" << std::endl;
+}
+
+void request_callback(const struct clap_host* host) {
+    UNREFERENCED_PARAMETER(host);
+    std::cout << "request_callback" << std::endl;
+}
+
+//
+//
 bool load_clap_plugin(const char* pluginPath) {
     const clap_plugin_factory* pluginFactory = nullptr;
     const clap_host host = {
@@ -19,7 +44,11 @@ bool load_clap_plugin(const char* pluginPath) {
 		"Clap Test Host", // name
 		"Device Drivers", // vender
 		"http://www.devdrv.co.jp/", // url
-		"0.1", // product version
+		"0.1", // product version,
+        get_extension, // get_extension
+		request_restart, // request_restart
+		request_process, // request_process
+		request_callback, // request_callback
     };
 
     HMODULE hModule = LoadLibraryA(pluginPath);
@@ -52,7 +81,8 @@ bool load_clap_plugin(const char* pluginPath) {
         return false;
     }
 
-    if (!plugin || plugin->init(plugin)) {
+    if (!plugin) {
+    /* if (!plugin || !plugin->init(plugin)) { */
         std::cerr << "Failed to create CLAP plugin instance." << std::endl;
         return false;
     }
