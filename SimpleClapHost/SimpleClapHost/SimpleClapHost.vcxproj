@@ -135,6 +135,7 @@
   <ItemGroup>
     <ClInclude Include="..\clap\clap.h" />
     <ClInclude Include="..\clap\plugin.h" />
+    <ClInclude Include="ClapHost.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

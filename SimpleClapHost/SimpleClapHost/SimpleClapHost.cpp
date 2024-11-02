@@ -8,6 +8,7 @@
 #include <vector>
 #include <clap/clap.h>
 #include <clap/process.h>
+#include "ClapHost.h"
 
 //#include "SimpleClapHost.hh"
 
@@ -15,7 +16,7 @@
 
 bool load_clap_plugin(const char* pluginPath);
 
-void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames, WAVEFORMATEX* pwfx);
+void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames, WAVEFORMATEX* pwfx, ClapHostBuffer* input, ClapHostBuffer* output);
 
 #define BUFFER_SIZE 9600
 
@@ -59,7 +60,13 @@ void PrintDeviceInfo(IMMDevice* pDevice) {
 }
 
 // Process audio stream
-void HandleAudioStream(IAudioClient* pAudioClientIn, IAudioClient* pAudioClientOut, IAudioCaptureClient* pCaptureClient, IAudioRenderClient* pRenderClient, WAVEFORMATEX* pwfx) {
+void HandleAudioStream(IAudioClient* pAudioClientIn,
+    IAudioClient* pAudioClientOut,
+    IAudioCaptureClient* pCaptureClient,
+    IAudioRenderClient* pRenderClient,
+    WAVEFORMATEX* pwfx,
+    ClapHostBuffer *input,
+    ClapHostBuffer *output) {
     BYTE* pData;
     DWORD flags;
     UINT32 packetLength = 0;
@@ -115,7 +122,7 @@ void HandleAudioStream(IAudioClient* pAudioClientIn, IAudioClient* pAudioClientO
             // Write data to render buffer
             //memcpy(pRenderData, buffer.data(), numFramesAvailable * pwfx->nBlockAlign);
 
-            process_audio_data(buffer.data(), pRenderData, numFramesAvailable, pwfx);
+            process_audio_data(buffer.data(), pRenderData, numFramesAvailable, pwfx, input, output);
 
             hr = pRenderClient->ReleaseBuffer(numFramesAvailable, 0);
             if (FAILED(hr)) {
@@ -234,7 +241,13 @@ HRESULT StartAudioProcessing() {
     std::wcout << L"Sample Rate: " << pwfx->nSamplesPerSec << std::endl;
     std::wcout << L"Bits Per Sample: " << pwfx->wBitsPerSample << std::endl;
 
-    HandleAudioStream(pAudioClientIn, pAudioClientOut, pCaptureClient, pRenderClient, pwfx);
+    ClapHostBuffer* input = new ClapHostBuffer();
+    ClapHostBuffer* output = new ClapHostBuffer();
+
+    HandleAudioStream(pAudioClientIn, pAudioClientOut, pCaptureClient, pRenderClient, pwfx, input, output);
+
+    delete input;
+    delete output;
 
     // Free resources
     pCaptureClient->Release();
@@ -250,14 +263,31 @@ HRESULT StartAudioProcessing() {
 }
 
 // CLAPプラグインの運用
-void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames, WAVEFORMATEX* pwfx) {
+void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames, WAVEFORMATEX* pwfx, ClapHostBuffer* input, ClapHostBuffer* output) {
     // CLAPバッファの準備
     clap_process process_data = {};
     process_data.frames_count = numFrames;
 
+#if 0
+    typedef struct clap_audio_buffer {
+        // Either data32 or data64 pointer will be set.
+        float** data32;
+        double** data64;
+        uint32_t channel_count;
+        uint32_t latency; // latency from/to the audio interface
+        uint64_t constant_mask;
+    } clap_audio_buffer_t;
+#endif
+
     // 入力と出力のオーディオバッファをCLAP形式に変換
     clap_audio_buffer input_buffer[1] = {0};
     clap_audio_buffer output_buffer[1] = {0};
+
+#if 0
+
+    //clap_audio_buffer_t input_bufferT[1] = { 0 };
+    //clap_audio_buffer_t output_bufferT[1] = { 0 };
+
 
 	if (pRenderData == 0) {
 		std::cerr << "Buffer frame count is zero." << std::endl;
@@ -267,37 +297,30 @@ void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames,
 		// Just for debug
 		std::cerr << "numFrames is more than BUFFER_SIZE: " << numFrames << std::endl;
 	}
-
-    // Now reordering the capture buffer
-    BYTE** pReorderedData = new BYTE * [2];
-    pReorderedData[0] = new BYTE[BUFFER_SIZE / 2];
-    pReorderedData[1] = new BYTE[BUFFER_SIZE / 2];
-
-    BYTE** pRenderBuffer = new BYTE * [2];
-    pRenderBuffer[0] = new BYTE[BUFFER_SIZE / 2];
-    pRenderBuffer[1] = new BYTE[BUFFER_SIZE / 2];
-
-    for (UINT i = 0; i < BUFFER_SIZE / 2; i++) {
-        pReorderedData[0][i] = pCaptureData[i * 2];
-        pReorderedData[1][i] = pCaptureData[i * 2 + 1];
+#endif
 
 #if 0 // debug
         printf("%u: %d,%d:%d,%d => %d,%d\n", i, i * 2, i * 2 + 1,
             pCaptureData[i * 2],
             pCaptureData[i * 2 + 1],
             pReorderedData[0][i],
-            pReorderedData[1][i]
+            pReorderedData[1][i],
         );
 #endif
-    }
-
 	input_buffer[0].channel_count = 2;
 	output_buffer[0].channel_count = 2;
 
+    for (UINT i = 0; i < BUFFER_SIZE / 2; i++) {
+        input->pReorderedBuffer[0][i] = pCaptureData[i * 2];
+        input->pReorderedBuffer[1][i] = pCaptureData[i * 2 + 1];
+    }
+
+
+
 	//input_buffer[0].data32 = reinterpret_cast<float**>(&pCaptureData);
 	//output_buffer[0].data32 = reinterpret_cast<float**>(&pRenderData);
-	input_buffer[0].data32 = (float**)pReorderedData; // from capture buffer
-    output_buffer[0].data32 = (float**) pRenderBuffer;
+	input_buffer[0].data32 = (float**)input->pReorderedBuffer;
+    output_buffer[0].data32 = (float**) output->pReorderedBuffer;
 
     process_data.audio_inputs = &input_buffer[0];
     process_data.audio_outputs = &output_buffer[0];
@@ -313,17 +336,9 @@ void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames,
 
     // Now reordering the render buffer
 	for (UINT i = 0; i < BUFFER_SIZE / 2; i++) {
-		pRenderData[i * 2] = pRenderBuffer[0][i];
-		pRenderData[i * 2 + 1] = pRenderBuffer[1][i];
+		pRenderData[i * 2] = output->pReorderedBuffer[0][i];
+		pRenderData[i * 2 + 1] = output->pReorderedBuffer[1][i];
 	}
-
-	// メモリの解放
-	delete[] pReorderedData[0];
-	delete[] pReorderedData[1];
-	delete[] pReorderedData;
-	delete[] pRenderBuffer[0];
-	delete[] pRenderBuffer[1];
-	delete[] pRenderBuffer;
 }
 
 // Entry point
@@ -338,6 +353,7 @@ int main() {
 	}
 
     std::wcout << L"Starting audio processing..." << std::endl;
+
     StartAudioProcessing();
 
     return 0;

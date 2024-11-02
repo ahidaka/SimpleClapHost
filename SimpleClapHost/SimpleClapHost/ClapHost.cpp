@@ -5,10 +5,11 @@
 #include <mmdeviceapi.h>
 #include <vector>
 #include <iostream>
+#include "ClapHost.h"
 
-#define BUFFER_SIZE 19200  // Process 10ms audio data
+//#define BUFFER_SIZE 19200  // Process 10ms audio data
 
-void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames, WAVEFORMATEX* pwfx);
+void process_audio_data(BYTE* pCaptureData, BYTE* pRenderData, UINT32 numFrames, WAVEFORMATEX* pwfx, ClapHostBuffer* input, ClapHostBuffer* output);
 
 clap_plugin* plugin = nullptr;
 
@@ -88,4 +89,16 @@ bool load_clap_plugin(const char* pluginPath) {
     }
 
     return true;
+}
+
+ClapHostBuffer::ClapHostBuffer() {
+    BYTE** pReorderedBuffer = new BYTE * [2];
+    pReorderedBuffer[0] = new BYTE[buffer_size / 2];
+    pReorderedBuffer[1] = new BYTE[buffer_size / 2];
+}
+
+ClapHostBuffer::~ClapHostBuffer() {
+    delete[] pReorderedBuffer[0];
+    delete[] pReorderedBuffer[1];
+    delete[] pReorderedBuffer;
 }
