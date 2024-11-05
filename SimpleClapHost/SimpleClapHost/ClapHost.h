@@ -4,12 +4,13 @@
 #include <iostream>
 
 #define BUFFER_SIZE 9600
+//#define BUFFER_SIZE 19200 // just for test
 
 class ClapHostBuffer {
 public:
     ClapHostBuffer();
     ~ClapHostBuffer();
 
-    BYTE** pReorderedBuffer = nullptr;;
+    DWORD** pReorderedBuffer = nullptr;;
     const int buffer_size = BUFFER_SIZE;
 };

@@ -92,9 +92,9 @@ bool load_clap_plugin(const char* pluginPath) {
 }
 
 ClapHostBuffer::ClapHostBuffer() {
-    BYTE** pReorderedBuffer = new BYTE * [2];
-    pReorderedBuffer[0] = new BYTE[buffer_size / 2];
-    pReorderedBuffer[1] = new BYTE[buffer_size / 2];
+    pReorderedBuffer = new DWORD * [2];
+    pReorderedBuffer[0] = new DWORD[buffer_size / 2];
+    pReorderedBuffer[1] = new DWORD[buffer_size / 2];
 }
 
 ClapHostBuffer::~ClapHostBuffer() {
